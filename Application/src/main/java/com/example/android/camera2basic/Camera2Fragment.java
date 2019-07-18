@@ -57,7 +57,11 @@ import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageButton;
 import android.widget.Toast;
+
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -71,7 +75,7 @@ import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
-public class Camera2BasicFragment extends Fragment
+public class Camera2Fragment extends Fragment
         implements View.OnClickListener, ActivityCompat.OnRequestPermissionsResultCallback {
 
     /**
@@ -80,6 +84,7 @@ public class Camera2BasicFragment extends Fragment
     private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
     private static final int REQUEST_CAMERA_PERMISSION = 1;
     private static final String FRAGMENT_DIALOG = "dialog";
+    private ImageButton preview;
 
     static {
         ORIENTATIONS.append(Surface.ROTATION_0, 90);
@@ -91,7 +96,7 @@ public class Camera2BasicFragment extends Fragment
     /**
      * Tag for the {@link Log}.
      */
-    private static final String TAG = "Camera2BasicFragment";
+    private static final String TAG = "Camera2Fragment";
 
     /**
      * Camera state: Showing camera preview.
@@ -234,6 +239,8 @@ public class Camera2BasicFragment extends Fragment
      */
     private File mFile;
 
+    private ImageSaver.MyListener listener;
+
     /**
      * This a callback object for the {@link ImageReader}. "onImageAvailable" will be called when a
      * still image is ready to be saved.
@@ -243,9 +250,10 @@ public class Camera2BasicFragment extends Fragment
 
         @Override
         public void onImageAvailable(ImageReader reader) {
-            mBackgroundHandler.post(new ImageSaver(reader.acquireNextImage(), mFile));
+            Log.d ("asdasdasd","99999999999999");
+            mBackgroundHandler.post(new ImageSaver(reader.acquireNextImage(), mFile, listener));
         }
-
+;
     };
 
     /**
@@ -414,8 +422,8 @@ public class Camera2BasicFragment extends Fragment
         }
     }
 
-    public static Camera2BasicFragment newInstance() {
-        return new Camera2BasicFragment();
+    public static Camera2Fragment newInstance() {
+        return new Camera2Fragment();
     }
 
     @Override
@@ -427,7 +435,7 @@ public class Camera2BasicFragment extends Fragment
     @Override
     public void onViewCreated(final View view, Bundle savedInstanceState) {
         view.findViewById(R.id.picture).setOnClickListener(this);
-        view.findViewById(R.id.info).setOnClickListener(this);
+        preview = view.findViewById(R.id.preview);
         mTextureView = (AutoFitTextureView) view.findViewById(R.id.texture);
     }
 
@@ -514,6 +522,7 @@ public class Camera2BasicFragment extends Fragment
                         new CompareSizesByArea());
                 mImageReader = ImageReader.newInstance(largest.getWidth(), largest.getHeight(),
                         ImageFormat.JPEG, /*maxImages*/2);
+                Log.d ("asdasdasd","setup");
                 mImageReader.setOnImageAvailableListener(
                         mOnImageAvailableListener, mBackgroundHandler);
 
@@ -597,7 +606,7 @@ public class Camera2BasicFragment extends Fragment
     }
 
     /**
-     * Opens the camera specified by {@link Camera2BasicFragment#mCameraId}.
+     * Opens the camera specified by {@link Camera2Fragment#mCameraId}.
      */
     private void openCamera(int width, int height) {
         if (ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.CAMERA)
@@ -765,7 +774,9 @@ public class Camera2BasicFragment extends Fragment
     /**
      * Initiate a still image capture.
      */
-    private void takePicture() {
+    private void takePicture(ImageSaver.MyListener l) {
+        Log.d("asdasdasd","ggggggggggggggg");
+        listener = l;
         lockFocus();
     }
 
@@ -888,19 +899,25 @@ public class Camera2BasicFragment extends Fragment
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.picture: {
-                takePicture();
+                takePicture(new ImageSaver.MyListener() {
+                    @Override
+                    public void onFileSaved() {
+                        getActivity().runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Glide.with(getContext()).load(mFile.toString()).diskCacheStrategy(DiskCacheStrategy.NONE).skipMemoryCache(true).into(preview);
+                            }
+                        });
+
+                    }
+                });
                 break;
             }
-            case R.id.info: {
-                Activity activity = getActivity();
-                if (null != activity) {
-                    new AlertDialog.Builder(activity)
-                            .setMessage(R.string.intro_message)
-                            .setPositiveButton(android.R.string.ok, null)
-                            .show();
-                }
-                break;
-            }
+            case R.id.preview:
+
+
+
+
         }
     }
 
@@ -925,9 +942,17 @@ public class Camera2BasicFragment extends Fragment
          */
         private final File mFile;
 
-        ImageSaver(Image image, File file) {
+        private final MyListener mListener;
+
+        public interface MyListener {
+            public void onFileSaved();
+        }
+
+        ImageSaver(Image image, File file, MyListener listener) {
             mImage = image;
             mFile = file;
+            mListener = listener;
+
         }
 
         @Override
@@ -950,7 +975,10 @@ public class Camera2BasicFragment extends Fragment
                         e.printStackTrace();
                     }
                 }
+
             }
+            Log.d("asdasdasd","2222234e4e4");
+            mListener.onFileSaved();
         }
 
     }
